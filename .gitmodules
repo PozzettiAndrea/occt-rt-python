@@ -1,0 +1,3 @@
+[submodule "external/OCCT-RT"]
+	path = external/OCCT-RT
+	url = https://github.com/PozzettiAndrea/OCCT-RT.git

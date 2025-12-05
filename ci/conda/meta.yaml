@@ -1,0 +1,70 @@
+{% set name = "occt-rt" %}
+{% set version = "1.0.0" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  path: ../..
+
+build:
+  number: 0
+  script: |
+    mkdir build && cd build
+    cmake .. \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=$PREFIX \
+      -DPython3_EXECUTABLE=$PYTHON \
+      -DOCCT_RT_DIR=$SRC_DIR/external/OCCT-RT
+    cmake --build . --parallel
+    # Install Python package
+    cp -r occt_rt $SP_DIR/
+  skip: true  # [win]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - cmake >=3.18
+    - ninja
+    - swig >=4.0
+  host:
+    - python
+    - pip
+    - numpy
+    - occt >=7.8,<7.10
+  run:
+    - python
+    - numpy
+    - pythonocc-core >=7.8
+    - {{ pin_compatible('occt', max_pin='x.x') }}
+
+test:
+  imports:
+    - occt_rt
+    - occt_rt._OCCTRT
+  requires:
+    - pytest
+  commands:
+    - python -c "from occt_rt import Raytracer; print('OK')"
+
+about:
+  home: https://github.com/PozzettiAndrea/occt-rt-python
+  license: LGPL-2.1-or-later
+  license_family: LGPL
+  license_file: LICENSE
+  summary: High-performance BVH raytracer for OpenCASCADE
+  description: |
+    OCCT-RT provides BVH-accelerated ray-surface intersection for OpenCASCADE
+    shapes. Features include:
+    - High performance: 6M+ rays/sec on 8-core systems
+    - Multiple backends: OCCT BVH (default), Intel Embree with SIMD
+    - OpenMP parallelization for batch ray processing
+    - Newton refinement for exact surface intersection
+    - Curvature computation at hit points
+  dev_url: https://github.com/PozzettiAndrea/occt-rt-python
+  doc_url: https://github.com/PozzettiAndrea/occt-rt-python#readme
+
+extra:
+  recipe-maintainers:
+    - PozzettiAndrea
