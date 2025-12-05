@@ -10,17 +10,17 @@ source:
 
 build:
   number: 0
-  script: |
-    mkdir build && cd build
-    cmake .. \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=$PREFIX \
-      -DPython3_EXECUTABLE=$PYTHON \
-      -DOCCT_RT_DIR=$SRC_DIR/external/OCCT-RT
-    cmake --build . --parallel
-    # Install Python package
-    cp -r occt_rt $SP_DIR/
-  skip: true  # [win]
+  script_env:
+    - OCCT_RT_DIR
+  script:
+    - mkdir build || true  # [not win]
+    - if not exist build mkdir build  # [win]
+    - cd build
+    - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=%PREFIX% -DPython3_EXECUTABLE=%PYTHON% -DOCCT_RT_DIR=%SRC_DIR%\external\OCCT-RT  # [win]
+    - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX -DPython3_EXECUTABLE=$PYTHON -DOCCT_RT_DIR=$SRC_DIR/external/OCCT-RT  # [not win]
+    - cmake --build . --parallel --config Release
+    - xcopy /E /I occt_rt %SP_DIR%\occt_rt  # [win]
+    - cp -r occt_rt $SP_DIR/  # [not win]
 
 requirements:
   build:
@@ -32,12 +32,11 @@ requirements:
     - python
     - pip
     - numpy
-    - occt >=7.8,<7.10
+    - occt =7.8.1
   run:
     - python
     - numpy
-    - pythonocc-core >=7.8
-    - {{ pin_compatible('occt', max_pin='x.x') }}
+    # pythonocc-core is optional - users install separately if needed for shape input
 
 test:
   imports:
