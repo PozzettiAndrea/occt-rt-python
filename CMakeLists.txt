@@ -146,9 +146,13 @@ target_link_libraries(OCCTRT PRIVATE
     Python3::NumPy
 )
 
-# Set output directory
+# Set output directory (disable per-config subdirectories for multi-config generators)
 set_target_properties(OCCTRT PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/occt_rt"
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/occt_rt"
+    LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/occt_rt"
+    LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/occt_rt"
+    LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/occt_rt"
     SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
 )
 
