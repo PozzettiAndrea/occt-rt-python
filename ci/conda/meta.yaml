@@ -10,17 +10,6 @@ source:
 
 build:
   number: 0
-  script_env:
-    - OCCT_RT_DIR
-  script:
-    - mkdir build || true  # [not win]
-    - if not exist build mkdir build  # [win]
-    - cd build
-    - cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=%PREFIX% -DPython3_EXECUTABLE=%PYTHON% -DOCCT_RT_DIR=%SRC_DIR%\external\OCCT-RT  # [win]
-    - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX -DPython3_EXECUTABLE=$PYTHON -DOCCT_RT_DIR=$SRC_DIR/external/OCCT-RT  # [not win]
-    - cmake --build . --parallel --config Release
-    - xcopy /E /I occt_rt %SP_DIR%\occt_rt  # [win]
-    - cp -r occt_rt $SP_DIR/  # [not win]
 
 requirements:
   build:
