@@ -51,6 +51,29 @@ endif()
 message(STATUS "OCCT-RT: ${OCCT_RT_DIR}")
 
 # =============================================================================
+# PORTABLE OCCT LIBRARY FINDER
+# =============================================================================
+
+function(find_occt_library VAR_NAME LIB_NAME)
+    find_library(${VAR_NAME}
+        NAMES ${LIB_NAME}
+        PATHS ${OpenCASCADE_LIBRARY_DIR}
+        NO_DEFAULT_PATH
+    )
+    if(NOT ${VAR_NAME})
+        message(FATAL_ERROR "Could not find OCCT library: ${LIB_NAME}")
+    endif()
+endfunction()
+
+find_occt_library(OCCT_TKTopAlgo TKTopAlgo)
+find_occt_library(OCCT_TKBRep TKBRep)
+find_occt_library(OCCT_TKMath TKMath)
+find_occt_library(OCCT_TKernel TKernel)
+find_occt_library(OCCT_TKG3d TKG3d)
+find_occt_library(OCCT_TKGeomBase TKGeomBase)
+find_occt_library(OCCT_TKMesh TKMesh)
+
+# =============================================================================
 # BUILD OCCT-RT AS STATIC LIBRARY
 # =============================================================================
 
@@ -68,13 +91,13 @@ target_include_directories(occt_rt_core PUBLIC
 )
 
 target_link_libraries(occt_rt_core PUBLIC
-    ${OpenCASCADE_LIBRARY_DIR}/libTKTopAlgo.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKBRep.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKMath.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKernel.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKG3d.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKGeomBase.so
-    ${OpenCASCADE_LIBRARY_DIR}/libTKMesh.so
+    ${OCCT_TKTopAlgo}
+    ${OCCT_TKBRep}
+    ${OCCT_TKMath}
+    ${OCCT_TKernel}
+    ${OCCT_TKG3d}
+    ${OCCT_TKGeomBase}
+    ${OCCT_TKMesh}
 )
 
 # Optional: OpenMP
@@ -86,8 +109,8 @@ else()
     message(STATUS "OpenMP: not found")
 endif()
 
-# Optional: Embree
-find_package(embree 3 QUIET CONFIG)
+# Optional: Embree 4
+find_package(embree 4 QUIET CONFIG)
 if(embree_FOUND)
     target_link_libraries(occt_rt_core PUBLIC embree)
     target_compile_definitions(occt_rt_core PUBLIC OCCT_USE_EMBREE)

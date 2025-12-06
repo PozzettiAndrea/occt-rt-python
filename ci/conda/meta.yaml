@@ -33,9 +33,11 @@ requirements:
     - pip
     - numpy
     - occt =7.8.1
+    - embree >=4
   run:
     - python
     - numpy
+    - embree >=4
     # pythonocc-core is optional - users install separately if needed for shape input
 
 test:

@@ -8,12 +8,12 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "occt-rt"
-version = "1.0.0"
+version = "0.0.1"
 description = "High-performance BVH raytracer for OpenCASCADE"
 readme = "README.md"
 license = {text = "LGPL-2.1-or-later"}
 authors = [
-    {name = "Andrea Pozzetti", email = "andrea@example.com"}
+    {name = "Andrea Pozzetti", email = "andrea@pozzetti.it"}
 ]
 requires-python = ">=3.9"
 dependencies = [
@@ -26,11 +26,13 @@ classifiers = [
     "License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: C++",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Visualization",
