@@ -1,12 +1,20 @@
 @echo off
 setlocal EnableDelayedExpansion
 
+REM Find and activate Visual Studio (vswhere is in conda build env)
+for /f "usebackq tokens=*" %%i in (`vswhere.exe -latest -property installationPath`) do (
+    call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+)
+
+REM Clear CMAKE_GENERATOR to avoid conflicts
+set "CMAKE_GENERATOR="
+
 mkdir build
 cd build
 
 cmake -G Ninja ^
     -DCMAKE_BUILD_TYPE=Release ^
-    -DCMAKE_INSTALL_PREFIX=%PREFIX% ^
+    -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
     -DPython3_EXECUTABLE=%PYTHON% ^
     -DOCCT_RT_DIR=%SRC_DIR%\external\OCCT-RT ^
     ..
