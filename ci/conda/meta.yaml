@@ -16,6 +16,7 @@ build:
     - mkdir build || true  # [not win]
     - if not exist build mkdir build  # [win]
     - cd build
+    - set "CMAKE_GENERATOR="  # [win]
     - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=%PREFIX% -DPython3_EXECUTABLE=%PYTHON% -DOCCT_RT_DIR=%SRC_DIR%\external\OCCT-RT  # [win]
     - cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$PREFIX -DPython3_EXECUTABLE=$PYTHON -DOCCT_RT_DIR=$SRC_DIR/external/OCCT-RT  # [not win]
     - cmake --build . --parallel --config Release
@@ -31,12 +32,12 @@ requirements:
   host:
     - python
     - pip
-    - numpy
+    - numpy >=1.26
     - occt =7.8.1
     - embree >=4
   run:
     - python
-    - numpy
+    - numpy >=1.26
     - embree >=4
     # pythonocc-core is optional - users install separately if needed for shape input
 
