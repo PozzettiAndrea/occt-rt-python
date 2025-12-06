@@ -13,7 +13,7 @@ build:
 
 requirements:
   build:
-    - {{ compiler('cxx') }}
+    - {{ compiler('cxx') }}  # [not win]
     - cmake >=3.18
     - ninja
     - swig >=4.0

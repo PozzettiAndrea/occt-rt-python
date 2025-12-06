@@ -1,18 +1,10 @@
 @echo off
-setlocal EnableDelayedExpansion
 
-REM Find and activate Visual Studio (vswhere is in conda build env)
-for /f "usebackq tokens=*" %%i in (`vswhere.exe -latest -property installationPath`) do (
-    call "%%i\VC\Auxiliary\Build\vcvars64.bat"
-)
-
-REM Clear CMAKE_GENERATOR to avoid conflicts
-set "CMAKE_GENERATOR="
-
+REM Use Visual Studio generator - it finds the compiler automatically
 mkdir build
 cd build
 
-cmake -G Ninja ^
+cmake -G "Visual Studio 17 2022" -A x64 ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
     -DPython3_EXECUTABLE=%PYTHON% ^
@@ -20,7 +12,7 @@ cmake -G Ninja ^
     ..
 if errorlevel 1 exit 1
 
-cmake --build . --parallel --config Release
+cmake --build . --config Release --parallel
 if errorlevel 1 exit 1
 
 xcopy /E /I occt_rt %SP_DIR%\occt_rt
