@@ -7,6 +7,7 @@
 %module(package="occt_rt") _OCCTRT
 
 %{
+#include <cstring>
 #include <Standard.hxx>
 #include <Standard_Real.hxx>
 #include <Standard_Integer.hxx>
@@ -214,6 +215,13 @@ public:
     IntCurveSurface_TransitionOnCurve Transition(const Standard_Integer theIndex) const;
     TopAbs_State State(const Standard_Integer theIndex) const;
 
+    // Curvature accessors
+    Standard_Real GaussianCurvature(const Standard_Integer theIndex) const;
+    Standard_Real MeanCurvature(const Standard_Integer theIndex) const;
+    Standard_Real MinCurvature(const Standard_Integer theIndex) const;
+    Standard_Real MaxCurvature(const Standard_Integer theIndex) const;
+    Standard_Integer FaceIndex(const Standard_Integer theIndex) const;
+
     Standard_Boolean IsLoaded() const;
     Standard_Integer NbFaces() const;
 
@@ -256,8 +264,27 @@ public:
         $self->Load(*shape_ptr, tolerance, deflection);
     }
 
-    /* Cast multiple rays and return NumPy arrays */
-    PyObject* cast_rays_numpy(PyObject* origins_obj, PyObject* directions_obj) {
+    /* Cast multiple rays and return NumPy arrays
+     * output_mode: "basic" (hits, points, face_ids),
+     *              "normals" (+ normals),
+     *              "full" (+ curvatures)
+     */
+    PyObject* cast_rays_numpy(PyObject* origins_obj, PyObject* directions_obj, const char* output_mode = "normals") {
+        // Parse output mode
+        bool compute_normals = true;
+        bool compute_curvatures = false;
+
+        if (strcmp(output_mode, "basic") == 0) {
+            compute_normals = false;
+            compute_curvatures = false;
+        } else if (strcmp(output_mode, "normals") == 0) {
+            compute_normals = true;
+            compute_curvatures = false;
+        } else if (strcmp(output_mode, "full") == 0) {
+            compute_normals = true;
+            compute_curvatures = true;
+        }
+
         // Validate inputs
         PyArrayObject* origins = (PyArrayObject*)PyArray_FROM_OTF(origins_obj, NPY_FLOAT64, NPY_ARRAY_IN_ARRAY);
         PyArrayObject* directions = (PyArrayObject*)PyArray_FROM_OTF(directions_obj, NPY_FLOAT64, NPY_ARRAY_IN_ARRAY);
@@ -296,37 +323,56 @@ public:
         double* orig_data = (double*)PyArray_DATA(origins);
         double* dir_data = (double*)PyArray_DATA(directions);
 
-        // Create output arrays
+        // Create output arrays (always allocated)
         npy_intp dims_n = n_rays;
         npy_intp dims_n3[2] = {n_rays, 3};
-        npy_intp dims_n2[2] = {n_rays, 2};
 
         PyArrayObject* hits = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_BOOL);
         PyArrayObject* points = (PyArrayObject*)PyArray_SimpleNew(2, dims_n3, NPY_FLOAT64);
-        PyArrayObject* normals = (PyArrayObject*)PyArray_SimpleNew(2, dims_n3, NPY_FLOAT64);
-        PyArrayObject* uvs = (PyArrayObject*)PyArray_SimpleNew(2, dims_n2, NPY_FLOAT64);
-        PyArrayObject* ws = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
         PyArrayObject* face_ids = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_INT32);
 
-        if (!hits || !points || !normals || !uvs || !ws || !face_ids) {
+        // Conditionally allocated arrays
+        PyArrayObject* normals = NULL;
+        PyArrayObject* gauss_curv = NULL;
+        PyArrayObject* mean_curv = NULL;
+        PyArrayObject* min_curv = NULL;
+        PyArrayObject* max_curv = NULL;
+
+        if (compute_normals) {
+            normals = (PyArrayObject*)PyArray_SimpleNew(2, dims_n3, NPY_FLOAT64);
+        }
+        if (compute_curvatures) {
+            gauss_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            mean_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            min_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            max_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+        }
+
+        if (!hits || !points || !face_ids ||
+            (compute_normals && !normals) ||
+            (compute_curvatures && (!gauss_curv || !mean_curv || !min_curv || !max_curv))) {
             Py_DECREF(origins);
             Py_DECREF(directions);
             Py_XDECREF(hits);
             Py_XDECREF(points);
-            Py_XDECREF(normals);
-            Py_XDECREF(uvs);
-            Py_XDECREF(ws);
             Py_XDECREF(face_ids);
+            Py_XDECREF(normals);
+            Py_XDECREF(gauss_curv);
+            Py_XDECREF(mean_curv);
+            Py_XDECREF(min_curv);
+            Py_XDECREF(max_curv);
             PyErr_SetString(PyExc_MemoryError, "Failed to allocate output arrays");
             return NULL;
         }
 
         npy_bool* hits_data = (npy_bool*)PyArray_DATA(hits);
         double* points_data = (double*)PyArray_DATA(points);
-        double* normals_data = (double*)PyArray_DATA(normals);
-        double* uvs_data = (double*)PyArray_DATA(uvs);
-        double* ws_data = (double*)PyArray_DATA(ws);
         int32_t* face_ids_data = (int32_t*)PyArray_DATA(face_ids);
+        double* normals_data = compute_normals ? (double*)PyArray_DATA(normals) : NULL;
+        double* gauss_data = compute_curvatures ? (double*)PyArray_DATA(gauss_curv) : NULL;
+        double* mean_data = compute_curvatures ? (double*)PyArray_DATA(mean_curv) : NULL;
+        double* min_data = compute_curvatures ? (double*)PyArray_DATA(min_curv) : NULL;
+        double* max_data = compute_curvatures ? (double*)PyArray_DATA(max_curv) : NULL;
 
         // Perform raycasting
         for (npy_intp i = 0; i < n_rays; i++) {
@@ -344,28 +390,40 @@ public:
                 points_data[i*3+1] = p.Y();
                 points_data[i*3+2] = p.Z();
 
-                gp_Dir n = $self->Normal(1);
-                normals_data[i*3] = n.X();
-                normals_data[i*3+1] = n.Y();
-                normals_data[i*3+2] = n.Z();
+                face_ids_data[i] = $self->FaceIndex(1);
 
-                uvs_data[i*2] = $self->U(1);
-                uvs_data[i*2+1] = $self->V(1);
+                if (compute_normals) {
+                    gp_Dir n = $self->Normal(1);
+                    normals_data[i*3] = n.X();
+                    normals_data[i*3+1] = n.Y();
+                    normals_data[i*3+2] = n.Z();
+                }
 
-                ws_data[i] = $self->W(1);
-                face_ids_data[i] = 1;  // Face() returns TopoDS_Face, need index
+                if (compute_curvatures) {
+                    gauss_data[i] = $self->GaussianCurvature(1);
+                    mean_data[i] = $self->MeanCurvature(1);
+                    min_data[i] = $self->MinCurvature(1);
+                    max_data[i] = $self->MaxCurvature(1);
+                }
             } else {
                 hits_data[i] = 0;
                 points_data[i*3] = 0;
                 points_data[i*3+1] = 0;
                 points_data[i*3+2] = 0;
-                normals_data[i*3] = 0;
-                normals_data[i*3+1] = 0;
-                normals_data[i*3+2] = 1;
-                uvs_data[i*2] = 0;
-                uvs_data[i*2+1] = 0;
-                ws_data[i] = -1;
                 face_ids_data[i] = -1;
+
+                if (compute_normals) {
+                    normals_data[i*3] = 0;
+                    normals_data[i*3+1] = 0;
+                    normals_data[i*3+2] = 1;
+                }
+
+                if (compute_curvatures) {
+                    gauss_data[i] = 0;
+                    mean_data[i] = 0;
+                    min_data[i] = 0;
+                    max_data[i] = 0;
+                }
             }
         }
 
@@ -376,17 +434,27 @@ public:
         PyObject* result = PyDict_New();
         PyDict_SetItemString(result, "hits", (PyObject*)hits);
         PyDict_SetItemString(result, "points", (PyObject*)points);
-        PyDict_SetItemString(result, "normals", (PyObject*)normals);
-        PyDict_SetItemString(result, "uvs", (PyObject*)uvs);
-        PyDict_SetItemString(result, "ws", (PyObject*)ws);
         PyDict_SetItemString(result, "face_ids", (PyObject*)face_ids);
 
         Py_DECREF(hits);
         Py_DECREF(points);
-        Py_DECREF(normals);
-        Py_DECREF(uvs);
-        Py_DECREF(ws);
         Py_DECREF(face_ids);
+
+        if (compute_normals) {
+            PyDict_SetItemString(result, "normals", (PyObject*)normals);
+            Py_DECREF(normals);
+        }
+
+        if (compute_curvatures) {
+            PyDict_SetItemString(result, "gauss_curvatures", (PyObject*)gauss_curv);
+            PyDict_SetItemString(result, "mean_curvatures", (PyObject*)mean_curv);
+            PyDict_SetItemString(result, "min_curvatures", (PyObject*)min_curv);
+            PyDict_SetItemString(result, "max_curvatures", (PyObject*)max_curv);
+            Py_DECREF(gauss_curv);
+            Py_DECREF(mean_curv);
+            Py_DECREF(min_curv);
+            Py_DECREF(max_curv);
+        }
 
         return result;
     }

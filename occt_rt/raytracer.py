@@ -125,6 +125,7 @@ class Raytracer:
         direction: Tuple[float, float, float],
         min_dist: float = 0.0,
         max_dist: float = 1e308,
+        include_curvatures: bool = False,
     ) -> Dict:
         """
         Cast a single ray and return hit information.
@@ -134,6 +135,7 @@ class Raytracer:
             direction: Ray direction (x, y, z) - will be normalized
             min_dist: Minimum distance along ray to consider (default: 0)
             max_dist: Maximum distance along ray to consider (default: infinity)
+            include_curvatures: Whether to include curvature data (default: False)
 
         Returns:
             Dictionary with hit information:
@@ -143,6 +145,10 @@ class Raytracer:
             - uv (ndarray[2]): UV parameters on surface (if hit)
             - w (float): Distance along ray (if hit)
             - face_id (int): Index of hit face (if hit)
+            - gauss_curvature (float): Gaussian curvature (if include_curvatures)
+            - mean_curvature (float): Mean curvature (if include_curvatures)
+            - min_curvature (float): Min principal curvature (if include_curvatures)
+            - max_curvature (float): Max principal curvature (if include_curvatures)
         """
         # Create gp_Lin
         pnt = _OCCTRT.gp_Pnt(origin[0], origin[1], origin[2])
@@ -159,19 +165,28 @@ class Raytracer:
         hit_pnt = self._rt.Pnt(1)
         normal = self._rt.Normal(1)
 
-        return {
+        result = {
             "hit": True,
             "point": np.array([hit_pnt.X(), hit_pnt.Y(), hit_pnt.Z()]),
             "normal": np.array([normal.X(), normal.Y(), normal.Z()]),
             "uv": np.array([self._rt.U(1), self._rt.V(1)]),
             "w": self._rt.W(1),
-            "face_id": 1,  # TODO: get actual face index
+            "face_id": self._rt.FaceIndex(1),
         }
+
+        if include_curvatures:
+            result["gauss_curvature"] = self._rt.GaussianCurvature(1)
+            result["mean_curvature"] = self._rt.MeanCurvature(1)
+            result["min_curvature"] = self._rt.MinCurvature(1)
+            result["max_curvature"] = self._rt.MaxCurvature(1)
+
+        return result
 
     def cast_rays(
         self,
         origins: np.ndarray,
         directions: np.ndarray,
+        output_mode: str = "normals",
     ) -> Dict[str, np.ndarray]:
         """
         Cast multiple rays in batch (uses OpenMP if enabled).
@@ -179,15 +194,21 @@ class Raytracer:
         Args:
             origins: Nx3 array of ray origins
             directions: Nx3 array of ray directions
+            output_mode: What to compute - 'basic', 'normals', or 'full'
+                - 'basic': hits, points, face_ids (fastest)
+                - 'normals': basic + surface normals
+                - 'full': normals + curvatures (slowest)
 
         Returns:
             Dictionary with NumPy arrays:
             - hits (bool[N]): Whether each ray hit
             - points (float[N,3]): Hit points
-            - normals (float[N,3]): Surface normals
-            - uvs (float[N,2]): UV parameters
-            - ws (float[N]): Distances along rays
             - face_ids (int[N]): Face indices (-1 if no hit)
+            - normals (float[N,3]): Surface normals (if output_mode != 'basic')
+            - gauss_curvatures (float[N]): Gaussian curvature (if output_mode == 'full')
+            - mean_curvatures (float[N]): Mean curvature (if output_mode == 'full')
+            - min_curvatures (float[N]): Min principal curvature (if output_mode == 'full')
+            - max_curvatures (float[N]): Max principal curvature (if output_mode == 'full')
         """
         origins = np.asarray(origins, dtype=np.float64)
         directions = np.asarray(directions, dtype=np.float64)
@@ -197,7 +218,10 @@ class Raytracer:
         if directions.ndim == 1:
             directions = directions.reshape(1, 3)
 
-        return self._rt.cast_rays_numpy(origins, directions)
+        if output_mode not in ("basic", "normals", "full"):
+            raise ValueError(f"output_mode must be 'basic', 'normals', or 'full', got '{output_mode}'")
+
+        return self._rt.cast_rays_numpy(origins, directions, output_mode)
 
     def render_orthographic(
         self,
@@ -205,7 +229,8 @@ class Raytracer:
         bounds: Tuple[float, float, float, float],
         axis: str = "z",
         offset: float = 100.0,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        output_mode: str = "normals",
+    ) -> Dict[str, np.ndarray]:
         """
         Render orthographic depth and normal maps.
 
@@ -214,12 +239,20 @@ class Raytracer:
             bounds: (xmin, ymin, xmax, ymax) bounding box in view plane
             axis: View axis - 'x', 'y', or 'z' (default: 'z' = top-down)
             offset: Distance to start rays from above bounds (default: 100)
+            output_mode: What to compute - 'basic', 'normals', or 'full'
+                - 'basic': depth + face_ids (fastest)
+                - 'normals': basic + surface normals
+                - 'full': normals + curvatures (slowest)
 
         Returns:
-            Tuple of (depth_map, normal_map, face_id_map):
-            - depth_map: float32[H,W] - Z heights (NaN where no hit)
-            - normal_map: float32[H,W,3] - Surface normals
-            - face_id_map: int32[H,W] - Face indices (-1 where no hit)
+            Dictionary with image arrays:
+            - depth: float32[H,W] - Z heights (NaN where no hit)
+            - face_ids: int32[H,W] - Face indices (-1 where no hit)
+            - normals: float32[H,W,3] - Surface normals (if output_mode != 'basic')
+            - gauss_curvatures: float32[H,W] - Gaussian curvature (if output_mode == 'full')
+            - mean_curvatures: float32[H,W] - Mean curvature (if output_mode == 'full')
+            - min_curvatures: float32[H,W] - Min principal curvature (if output_mode == 'full')
+            - max_curvatures: float32[H,W] - Max principal curvature (if output_mode == 'full')
         """
         width, height = resolution
         xmin, ymin, xmax, ymax = bounds
@@ -255,12 +288,11 @@ class Raytracer:
             raise ValueError(f"axis must be 'x', 'y', or 'z', got '{axis}'")
 
         # Cast rays
-        results = self.cast_rays(origins, directions)
+        results = self.cast_rays(origins, directions, output_mode=output_mode)
 
         # Reshape results to images
         hits = results["hits"].reshape(height, width)
         points = results["points"].reshape(height, width, 3)
-        normals = results["normals"].reshape(height, width, 3)
         face_ids = results["face_ids"].reshape(height, width)
 
         # Create depth map (Z coordinate for z-axis view, etc.)
@@ -274,11 +306,23 @@ class Raytracer:
         # Set NaN where no hit
         depth[~hits] = np.nan
 
-        return (
-            depth.astype(np.float32),
-            normals.astype(np.float32),
-            face_ids.astype(np.int32),
-        )
+        # Build output dictionary
+        output = {
+            "depth": depth.astype(np.float32),
+            "face_ids": face_ids.astype(np.int32),
+        }
+
+        if output_mode in ("normals", "full"):
+            normals = results["normals"].reshape(height, width, 3)
+            output["normals"] = normals.astype(np.float32)
+
+        if output_mode == "full":
+            output["gauss_curvatures"] = results["gauss_curvatures"].reshape(height, width).astype(np.float32)
+            output["mean_curvatures"] = results["mean_curvatures"].reshape(height, width).astype(np.float32)
+            output["min_curvatures"] = results["min_curvatures"].reshape(height, width).astype(np.float32)
+            output["max_curvatures"] = results["max_curvatures"].reshape(height, width).astype(np.float32)
+
+        return output
 
     def __repr__(self) -> str:
         return (
