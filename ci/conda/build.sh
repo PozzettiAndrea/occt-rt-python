@@ -12,7 +12,15 @@ cmake .. \
 
 cmake --build . --parallel --config Release
 
+echo "=== Files in build/occt_rt after build ==="
+ls -la occt_rt/
+echo "=== End file listing ==="
+
 cp -r occt_rt $SP_DIR/
+
+echo "=== Files in $SP_DIR/occt_rt after copy ==="
+ls -la $SP_DIR/occt_rt/
+echo "=== End file listing ==="
 
 # Detect platform for correct library extension
 if [[ "$OSTYPE" == "darwin"* ]]; then
