@@ -42,6 +42,18 @@ elif sys.platform == 'linux' and os.path.isdir(_libs_dir):
             except OSError:
                 pass
 
+elif sys.platform == 'darwin' and os.path.isdir(_libs_dir):
+    # macOS: Preload bundled shared libraries
+    for lib_name in ['libTKernel.dylib', 'libTKMath.dylib', 'libTKG2d.dylib', 'libTKG3d.dylib',
+                     'libTKGeomBase.dylib', 'libTKBRep.dylib', 'libTKGeomAlgo.dylib',
+                     'libTKTopAlgo.dylib', 'libTKMesh.dylib']:
+        lib_path = os.path.join(_libs_dir, lib_name)
+        if os.path.exists(lib_path):
+            try:
+                ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
+            except OSError:
+                pass
+
 from .raytracer import Raytracer, Backend
 
 __all__ = ["Raytracer", "Backend"]
