@@ -16,6 +16,7 @@ Example:
 import os
 import sys
 import ctypes
+import glob
 
 __version__ = "1.1.0"
 __author__ = "Andrea Pozzetti"
@@ -43,12 +44,13 @@ elif sys.platform == 'linux' and os.path.isdir(_libs_dir):
                 pass
 
 elif sys.platform == 'darwin' and os.path.isdir(_libs_dir):
-    # macOS: Preload bundled shared libraries
-    for lib_name in ['libTKernel.dylib', 'libTKMath.dylib', 'libTKG2d.dylib', 'libTKG3d.dylib',
-                     'libTKGeomBase.dylib', 'libTKBRep.dylib', 'libTKGeomAlgo.dylib',
-                     'libTKTopAlgo.dylib', 'libTKMesh.dylib']:
-        lib_path = os.path.join(_libs_dir, lib_name)
-        if os.path.exists(lib_path):
+    # macOS: Preload bundled shared libraries (use glob for versioned names)
+    for lib_base in ['libTKernel', 'libTKMath', 'libTKG2d', 'libTKG3d',
+                     'libTKGeomBase', 'libTKBRep', 'libTKGeomAlgo',
+                     'libTKTopAlgo', 'libTKMesh']:
+        # Match libTKernel.dylib, libTKernel.7.dylib, libTKernel.7.8.1.dylib, etc.
+        matches = glob.glob(os.path.join(_libs_dir, lib_base + '*.dylib'))
+        for lib_path in matches:
             try:
                 ctypes.CDLL(lib_path, mode=ctypes.RTLD_GLOBAL)
             except OSError:
