@@ -23,10 +23,12 @@ requirements:
     - numpy >=1.26
     - occt =7.8.1
     - embree >=4
+    - llvm-openmp  # [osx]
   run:
     - python
     - numpy >=1.26
     - embree >=4
+    - llvm-openmp  # [osx]
     # pythonocc-core is optional - users install separately if needed for shape input
 
 test:
