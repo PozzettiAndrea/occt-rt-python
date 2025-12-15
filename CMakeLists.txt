@@ -160,6 +160,8 @@ set_target_properties(OCCTRT PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/occt_rt"
     RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/occt_rt"
     SWIG_USE_TARGET_INCLUDE_DIRECTORIES TRUE
+    # Python extension modules need .so suffix on macOS (not .dylib)
+    SUFFIX ".${Python3_SOABI}.so"
 )
 
 # Copy __init__.py to build directory
