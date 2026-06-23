@@ -39,7 +39,9 @@ test:
     - occt_rt._OCCTRT
   requires:
     - pytest
-    - pythonocc-core
+    # pythonocc-core has no py3.13 build yet; on 3.13 the shape-based tests skip
+    # (the import/struct/enum tests still run).
+    - pythonocc-core  # [py<313]
   commands:
     - pytest -v test/
 

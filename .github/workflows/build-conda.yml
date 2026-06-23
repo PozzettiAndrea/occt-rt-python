@@ -7,6 +7,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Auto-cancel superseded runs for the same ref (tags get unique refs, so a
+# publishing tag run is never cancelled by a later branch push).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build (${{ matrix.os }}, Python ${{ matrix.python }})
@@ -14,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest, macos-13]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python: ['3.10', '3.11', '3.12']
         include:
           - os: ubuntu-latest

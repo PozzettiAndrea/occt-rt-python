@@ -1,0 +1,11 @@
+# Pin the compiler per platform. The Windows default activation requests the
+# VS2017 (v141) toolset, which isn't installed on the GitHub windows runner;
+# force vs2022 (v143). Linux/osx values match conda-forge defaults (no-op there).
+c_compiler:
+  - gcc       # [linux]
+  - clang     # [osx]
+  - vs2022    # [win]
+cxx_compiler:
+  - gxx       # [linux]
+  - clangxx   # [osx]
+  - vs2022    # [win]
