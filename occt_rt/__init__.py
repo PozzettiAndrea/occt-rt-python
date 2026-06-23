@@ -18,7 +18,12 @@ import sys
 import ctypes
 import glob
 
-__version__ = "1.1.0"
+try:
+    from importlib.metadata import version as _pkg_version, PackageNotFoundError
+
+    __version__ = _pkg_version("occt-rt")
+except Exception:  # not installed as a distribution (e.g. in-tree build)
+    __version__ = "1.3.2"
 __author__ = "Andrea Pozzetti"
 __license__ = "LGPL-2.1"
 
