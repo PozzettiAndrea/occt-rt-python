@@ -8,7 +8,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "occt-rt"
-version = "0.0.1"
+version = "1.2.0"
 description = "High-performance BVH raytracer for OpenCASCADE"
 readme = "README.md"
 license = {text = "LGPL-2.1-or-later"}

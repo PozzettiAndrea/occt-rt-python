@@ -187,6 +187,9 @@ struct BRepIntCurveSurface_HitResult {
     Standard_Real MeanCurvature;
     Standard_Real MinCurvature;
     Standard_Real MaxCurvature;
+    Standard_Real HeightHessXX;
+    Standard_Real HeightHessYY;
+    Standard_Real HeightHessXY;
 
     BRepIntCurveSurface_HitResult();
 };
@@ -220,6 +223,9 @@ public:
     Standard_Real MeanCurvature(const Standard_Integer theIndex) const;
     Standard_Real MinCurvature(const Standard_Integer theIndex) const;
     Standard_Real MaxCurvature(const Standard_Integer theIndex) const;
+    Standard_Real HeightHessXX(const Standard_Integer theIndex) const;
+    Standard_Real HeightHessYY(const Standard_Integer theIndex) const;
+    Standard_Real HeightHessXY(const Standard_Integer theIndex) const;
     Standard_Integer FaceIndex(const Standard_Integer theIndex) const;
 
     Standard_Boolean IsLoaded() const;
@@ -337,6 +343,9 @@ public:
         PyArrayObject* mean_curv = NULL;
         PyArrayObject* min_curv = NULL;
         PyArrayObject* max_curv = NULL;
+        PyArrayObject* hess_xx = NULL;
+        PyArrayObject* hess_yy = NULL;
+        PyArrayObject* hess_xy = NULL;
 
         if (compute_normals) {
             normals = (PyArrayObject*)PyArray_SimpleNew(2, dims_n3, NPY_FLOAT64);
@@ -346,11 +355,15 @@ public:
             mean_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
             min_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
             max_curv = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            hess_xx = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            hess_yy = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
+            hess_xy = (PyArrayObject*)PyArray_SimpleNew(1, &dims_n, NPY_FLOAT64);
         }
 
         if (!hits || !points || !face_ids ||
             (compute_normals && !normals) ||
-            (compute_curvatures && (!gauss_curv || !mean_curv || !min_curv || !max_curv))) {
+            (compute_curvatures && (!gauss_curv || !mean_curv || !min_curv || !max_curv ||
+                                    !hess_xx || !hess_yy || !hess_xy))) {
             Py_DECREF(origins);
             Py_DECREF(directions);
             Py_XDECREF(hits);
@@ -361,6 +374,9 @@ public:
             Py_XDECREF(mean_curv);
             Py_XDECREF(min_curv);
             Py_XDECREF(max_curv);
+            Py_XDECREF(hess_xx);
+            Py_XDECREF(hess_yy);
+            Py_XDECREF(hess_xy);
             PyErr_SetString(PyExc_MemoryError, "Failed to allocate output arrays");
             return NULL;
         }
@@ -373,6 +389,9 @@ public:
         double* mean_data = compute_curvatures ? (double*)PyArray_DATA(mean_curv) : NULL;
         double* min_data = compute_curvatures ? (double*)PyArray_DATA(min_curv) : NULL;
         double* max_data = compute_curvatures ? (double*)PyArray_DATA(max_curv) : NULL;
+        double* hxx_data = compute_curvatures ? (double*)PyArray_DATA(hess_xx) : NULL;
+        double* hyy_data = compute_curvatures ? (double*)PyArray_DATA(hess_yy) : NULL;
+        double* hxy_data = compute_curvatures ? (double*)PyArray_DATA(hess_xy) : NULL;
 
         // Perform raycasting
         for (npy_intp i = 0; i < n_rays; i++) {
@@ -404,6 +423,9 @@ public:
                     mean_data[i] = $self->MeanCurvature(1);
                     min_data[i] = $self->MinCurvature(1);
                     max_data[i] = $self->MaxCurvature(1);
+                    hxx_data[i] = $self->HeightHessXX(1);
+                    hyy_data[i] = $self->HeightHessYY(1);
+                    hxy_data[i] = $self->HeightHessXY(1);
                 }
             } else {
                 hits_data[i] = 0;
@@ -423,6 +445,9 @@ public:
                     mean_data[i] = 0;
                     min_data[i] = 0;
                     max_data[i] = 0;
+                    hxx_data[i] = 0;
+                    hyy_data[i] = 0;
+                    hxy_data[i] = 0;
                 }
             }
         }
@@ -450,10 +475,16 @@ public:
             PyDict_SetItemString(result, "mean_curvatures", (PyObject*)mean_curv);
             PyDict_SetItemString(result, "min_curvatures", (PyObject*)min_curv);
             PyDict_SetItemString(result, "max_curvatures", (PyObject*)max_curv);
+            PyDict_SetItemString(result, "curv_xx", (PyObject*)hess_xx);
+            PyDict_SetItemString(result, "curv_yy", (PyObject*)hess_yy);
+            PyDict_SetItemString(result, "curv_xy", (PyObject*)hess_xy);
             Py_DECREF(gauss_curv);
             Py_DECREF(mean_curv);
             Py_DECREF(min_curv);
             Py_DECREF(max_curv);
+            Py_DECREF(hess_xx);
+            Py_DECREF(hess_yy);
+            Py_DECREF(hess_xy);
         }
 
         return result;

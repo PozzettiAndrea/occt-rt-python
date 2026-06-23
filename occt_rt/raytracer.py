@@ -209,6 +209,9 @@ class Raytracer:
             - mean_curvatures (float[N]): Mean curvature (if output_mode == 'full')
             - min_curvatures (float[N]): Min principal curvature (if output_mode == 'full')
             - max_curvatures (float[N]): Max principal curvature (if output_mode == 'full')
+            - curv_xx, curv_yy, curv_xy (float[N]): Analytic height-field Hessian of the
+              world-Z top-down projection Z=h(X,Y) — d2Z/dX2, d2Z/dY2, d2Z/dXdY
+              (if output_mode == 'full')
         """
         origins = np.asarray(origins, dtype=np.float64)
         directions = np.asarray(directions, dtype=np.float64)
@@ -253,6 +256,8 @@ class Raytracer:
             - mean_curvatures: float32[H,W] - Mean curvature (if output_mode == 'full')
             - min_curvatures: float32[H,W] - Min principal curvature (if output_mode == 'full')
             - max_curvatures: float32[H,W] - Max principal curvature (if output_mode == 'full')
+            - curv_xx, curv_yy, curv_xy: float32[H,W] - Analytic height-field Hessian
+              d2Z/dX2, d2Z/dY2, d2Z/dXdY of the projection (if output_mode == 'full')
         """
         width, height = resolution
         xmin, ymin, xmax, ymax = bounds
@@ -321,6 +326,9 @@ class Raytracer:
             output["mean_curvatures"] = results["mean_curvatures"].reshape(height, width).astype(np.float32)
             output["min_curvatures"] = results["min_curvatures"].reshape(height, width).astype(np.float32)
             output["max_curvatures"] = results["max_curvatures"].reshape(height, width).astype(np.float32)
+            output["curv_xx"] = results["curv_xx"].reshape(height, width).astype(np.float32)
+            output["curv_yy"] = results["curv_yy"].reshape(height, width).astype(np.float32)
+            output["curv_xy"] = results["curv_xy"].reshape(height, width).astype(np.float32)
 
         return output
 
