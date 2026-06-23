@@ -1,10 +1,11 @@
 @echo off
 
-REM Use Visual Studio generator - it finds the compiler automatically
+REM The MSVC environment is activated by {{ compiler('cxx') }} (vs2022_win-64),
+REM so cl.exe is on PATH; use the Ninja generator like the Unix build.sh.
 mkdir build
 cd build
 
-cmake -G "Visual Studio 17 2022" -A x64 ^
+cmake -G Ninja ^
     -DCMAKE_BUILD_TYPE=Release ^
     -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
     -DPython3_EXECUTABLE=%PYTHON% ^
@@ -12,7 +13,7 @@ cmake -G "Visual Studio 17 2022" -A x64 ^
     ..
 if errorlevel 1 exit 1
 
-cmake --build . --config Release --parallel
+cmake --build . --parallel
 if errorlevel 1 exit 1
 
 xcopy /E /I occt_rt %SP_DIR%\occt_rt
