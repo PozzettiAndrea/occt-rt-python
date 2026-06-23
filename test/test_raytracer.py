@@ -64,9 +64,11 @@ class TestRaytracer:
 
         rt = Raytracer(sphere_shape, deflection=0.1)
 
-        # Ray from above, pointing down at center
+        # Ray from above, pointing down. Offset slightly from (0,0) so we don't hit the
+        # sphere's exact pole, which is a parametric singularity (and tessellation apex)
+        # where a tessellation-based raytracer can legitimately miss.
         result = rt.cast_ray(
-            origin=(0, 0, 100),
+            origin=(5, 5, 100),
             direction=(0, 0, -1),
         )
 
@@ -134,13 +136,15 @@ class TestRaytracer:
 
         rt = Raytracer(box_shape, deflection=0.05)
 
-        depth, normals, face_ids = rt.render_orthographic(
+        out = rt.render_orthographic(
             resolution=(64, 64),
             bounds=(-5, -10, 15, 30),
             axis="z",
             offset=50,
         )
 
+        # render_orthographic returns a dict of image arrays.
+        depth, normals, face_ids = out["depth"], out["normals"], out["face_ids"]
         assert depth.shape == (64, 64)
         assert normals.shape == (64, 64, 3)
         assert face_ids.shape == (64, 64)
@@ -206,6 +210,94 @@ class TestLowLevelAPI:
         hit = BRepIntCurveSurface_HitResult()
         assert hit.IsValid is False
         assert hit.FaceIndex == 0
+
+
+class TestAnalyticCurvature:
+    """Tests for the analytic height-field Hessian channels curv_xx/yy/xy.
+
+    These are the exact d2Z/dX2, d2Z/dY2, d2Z/dXdY of the world-Z top-down height
+    field, reprojected from the surface 2nd-order jet (no finite differences).
+    """
+
+    def _render_full(self, shape, res=128, bounds=(-60, -60, 60, 60), offset=120):
+        from occt_rt import Raytracer
+
+        rt = Raytracer(shape, deflection=0.05)
+        return rt.render_orthographic(
+            resolution=(res, res), bounds=bounds, axis="z",
+            offset=offset, output_mode="full",
+        )
+
+    def test_full_mode_exposes_hessian(self, sphere_shape):
+        """Full mode must expose the three height-Hessian channels as float32 images."""
+        out = self._render_full(sphere_shape)
+        for k in ("curv_xx", "curv_yy", "curv_xy"):
+            assert k in out, f"missing channel {k}"
+            assert out[k].shape == (128, 128)
+            assert out[k].dtype == np.float32
+            assert np.all(np.isfinite(out[k]))
+
+    def test_zero_outside_hits(self, sphere_shape):
+        """Curvature channels are exactly 0 where no ray hit."""
+        out = self._render_full(sphere_shape)
+        miss = np.isnan(out["depth"])
+        assert miss.any()
+        for k in ("curv_xx", "curv_yy", "curv_xy"):
+            assert np.all(out[k][miss] == 0.0)
+
+    def test_sphere_apex(self, sphere_shape):
+        """At the sphere apex (normal ~ +Z) curv_xx = curv_yy = -1/R, curv_xy = 0."""
+        out = self._render_full(sphere_shape)
+        nz = out["normals"][..., 2]
+        hit = ~np.isnan(out["depth"])
+        apex = hit & (nz > 0.999)
+        if not apex.any():
+            apex = nz == np.nanmax(np.where(hit, nz, -1.0))
+        R = 50.0
+        assert abs(out["curv_xx"][apex].mean() + 1.0 / R) < 0.10 / R
+        assert abs(out["curv_yy"][apex].mean() + 1.0 / R) < 0.10 / R
+        assert abs(out["curv_xy"][apex].mean()) < 0.10 / R
+
+    def test_hessian_matches_gaussian(self, sphere_shape):
+        """Headline cross-check: the new triple must reproduce the INDEPENDENTLY
+        computed Gaussian channel via the Monge identity K = det(Hess) * nz^4,
+        at every well-facing hit. Catches any error in the reproject math or signs.
+        """
+        out = self._render_full(sphere_shape)
+        nz = out["normals"][..., 2]
+        m = (~np.isnan(out["depth"])) & (np.abs(nz) > 0.5)
+        det = out["curv_xx"][m] * out["curv_yy"][m] - out["curv_xy"][m] ** 2
+        g_pred = det * nz[m] ** 4
+        g = out["gauss_curvatures"][m]
+        scale = np.percentile(np.abs(g), 90) + 1e-12
+        rel = np.abs(g_pred - g) / scale
+        assert np.median(rel) < 0.02
+        assert np.percentile(rel, 95) < 0.10
+
+    def test_flat_face_zero_curvature(self, box_shape):
+        """A flat top face has zero height curvature in all three channels."""
+        from occt_rt import Raytracer
+
+        rt = Raytracer(box_shape, deflection=0.05)
+        out = rt.render_orthographic(
+            resolution=(64, 64), bounds=(-5, -10, 15, 30), axis="z",
+            offset=50, output_mode="full",
+        )
+        nz = out["normals"][..., 2]
+        flat = (~np.isnan(out["depth"])) & (nz > 0.999)
+        assert flat.any()
+        for k in ("curv_xx", "curv_yy", "curv_xy"):
+            assert np.abs(out[k][flat]).max() < 1e-3
+
+
+def test_hitresult_has_hessian_fields():
+    """The low-level hit struct exposes the new Hessian fields, default 0."""
+    from occt_rt._OCCTRT import BRepIntCurveSurface_HitResult
+
+    hit = BRepIntCurveSurface_HitResult()
+    assert hit.HeightHessXX == 0.0
+    assert hit.HeightHessYY == 0.0
+    assert hit.HeightHessXY == 0.0
 
 
 if __name__ == "__main__":

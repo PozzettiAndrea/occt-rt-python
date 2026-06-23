@@ -32,13 +32,16 @@ requirements:
     # pythonocc-core is optional - users install separately if needed for shape input
 
 test:
+  source_files:
+    - test/
   imports:
     - occt_rt
     - occt_rt._OCCTRT
   requires:
     - pytest
+    - pythonocc-core
   commands:
-    - python -c "from occt_rt import Raytracer; print('OK')"
+    - pytest -v test/
 
 about:
   home: https://github.com/PozzettiAndrea/occt-rt-python

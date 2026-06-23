@@ -2,10 +2,9 @@ name: Build and Upload Conda Package
 
 on:
   push:
-    branches: [main, master]
+    branches: ['**']
     tags: ['v*']
   pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -54,32 +53,3 @@ jobs:
           ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
         run: |
           anaconda -t $ANACONDA_TOKEN upload --force $(conda-build ci/conda -c conda-forge --python=${{ matrix.python }} --output)
-
-  test:
-    name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
-    needs: build
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ['3.10']
-
-    steps:
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          auto-update-conda: true
-          python-version: ${{ matrix.python }}
-          channels: conda-forge
-          channel-priority: strict
-
-      - name: Install package from local build
-        shell: bash -el {0}
-        run: |
-          conda install -y -c local occt-rt || echo "Package not in local channel yet"
-
-      - name: Run import test
-        shell: bash -el {0}
-        run: |
-          python -c "from occt_rt import Raytracer; print('Import OK')" || echo "Skipping test - package not available"
